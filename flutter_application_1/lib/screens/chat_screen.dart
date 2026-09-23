@@ -25,8 +25,9 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController scrollController = ScrollController();
 
   late final ChatService _chatService =
-      widget.chatService ?? ChatService(baseUrl: 'http://10.0.2.2:8000');
-  String? sessionId;
+      widget.chatService ?? ChatService(baseUrl: 'http://172.31.99.216:8000');
+  String? userId;
+  String? conversationId;
   bool isLoadingHistory = true;
 
   bool isTyping = false;
@@ -38,11 +39,24 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _initSession() async {
-    final id = await ChatSession().getOrCreate();
+    final uid = await ChatSession().getOrCreateUserId();
     if (!mounted) return;
-    setState(() => sessionId = id);
+    setState(() => userId = uid);
 
-    final local = await _loadLocal(id);
+    var cid = await ChatSession().getConversationId();
+    if (cid == null) {
+      try {
+        cid = await _chatService.createConversation(userId: uid);
+        await ChatSession().setConversationId(cid);
+      } catch (_) {
+        cid = ChatSession.newMessageId();
+        await ChatSession().setConversationId(cid);
+      }
+    }
+    if (!mounted) return;
+    setState(() => conversationId = cid);
+
+    final local = await _loadLocal(cid);
     if (!mounted) return;
     setState(() {
       messages.addAll(local);
@@ -50,7 +64,10 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-    final history = await _chatService.fetchHistory(id);
+    final history = await _chatService.fetchHistory(
+      userId: uid,
+      conversationId: cid,
+    );
     if (!mounted || history.isEmpty) return;
     setState(() {
       messages
@@ -81,7 +98,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _persistLocal() async {
     try {
-      final id = sessionId;
+      final id = conversationId;
       if (id == null) return;
       final prefs = await SharedPreferences.getInstance();
       final raw = jsonEncode(messages.map((m) => m.toJson()).toList());
@@ -91,7 +108,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> sendMessage() async {
     final text = messageController.text.trim();
-    if (text.isEmpty || isTyping || sessionId == null) return;
+    if (text.isEmpty || isTyping || userId == null || conversationId == null) {
+      return;
+    }
 
     messageController.clear();
 
@@ -111,8 +130,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final reply = await _chatService.sendMessage(
+        userId: userId!,
+        conversationId: conversationId!,
         text: text,
-        sessionId: sessionId!,
       );
       if (!mounted) return;
       setState(() {
@@ -139,13 +159,21 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> newChat() async {
-    final id = await ChatSession().reset();
+    final uid = userId ?? await ChatSession().getOrCreateUserId();
+    String? cid;
+    try {
+      cid = await _chatService.createConversation(userId: uid);
+    } catch (_) {
+      cid = ChatSession.newMessageId();
+    }
+    await ChatSession().setConversationId(cid);
     if (!mounted) return;
     setState(() {
       messages.clear();
       isTyping = false;
       isLoadingHistory = false;
-      sessionId = id;
+      userId = uid;
+      conversationId = cid;
     });
     messageController.clear();
     _persistLocal();

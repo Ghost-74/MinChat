@@ -9,12 +9,22 @@ class FakeChatService extends ChatService {
   FakeChatService() : super(baseUrl: 'http://localhost');
 
   @override
-  Future<List<Message>> fetchHistory(String sessionId) async => [];
+  Future<String> createConversation({required String userId}) async =>
+      'fake-conv';
+
+  @override
+  Future<List<Message>> fetchHistory({
+    required String userId,
+    required String conversationId,
+  }) async =>
+      [];
 
   @override
   Future<Message> sendMessage({
+    required String userId,
+    required String conversationId,
     required String text,
-    required String sessionId,
+    String? timezone,
   }) async {
     return Message(
       id: 'fake-reply',
