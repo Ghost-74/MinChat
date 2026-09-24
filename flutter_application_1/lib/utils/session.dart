@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -9,6 +11,7 @@ class ChatSession {
   static const _uuid = Uuid();
   static const _userKey = 'minchat_user_id';
   static const _convKey = 'minchat_conversation_id';
+  static const _knownKey = 'minchat_known_conversations';
 
   String? _userId;
   String? _conversationId;
@@ -62,9 +65,45 @@ class ChatSession {
     await prefs.remove(_convKey);
   }
 
+  Future<void> addKnownConversation(String id, {String title = ''}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_knownKey);
+      final Map<String, dynamic> map =
+          raw != null && raw.isNotEmpty ? Map<String, dynamic>.from(
+              (await _decode(raw))) : {};
+      map[id] = {'title': title, 'updatedAt': DateTime.now().toIso8601String()};
+      await prefs.setString(_knownKey, await _encode(map));
+    } catch (_) {}
+  }
+
+  Future<Map<String, Map<String, String>>> getKnownConversations() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_knownKey);
+      if (raw == null || raw.isEmpty) return {};
+      final map = Map<String, dynamic>.from(await _decode(raw));
+      return map.map((k, v) {
+        final m = v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
+        return MapEntry(k, {
+          'title': (m['title'] ?? '').toString(),
+          'updatedAt': (m['updatedAt'] ?? '').toString(),
+        });
+      });
+    } catch (_) {
+      return {};
+    }
+  }
+
   static String newMessageId() =>
       DateTime.now().microsecondsSinceEpoch.toString();
 
   static String formatTimestamp(DateTime timestamp) =>
       timestamp.toUtc().toIso8601String();
+
+  Future<Map<String, dynamic>> _decode(String raw) async =>
+      Map<String, dynamic>.from(jsonDecode(raw) as Map);
+
+  Future<String> _encode(Map<String, dynamic> map) async =>
+      jsonEncode(map);
 }

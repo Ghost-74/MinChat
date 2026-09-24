@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/models/conversation.dart';
 import 'package:flutter_application_1/models/message.dart';
 import 'package:flutter_application_1/screens/chat_screen.dart';
 import 'package:flutter_application_1/services/chat_service.dart';
@@ -11,6 +12,9 @@ class FakeChatService extends ChatService {
   @override
   Future<String> createConversation({required String userId}) async =>
       'fake-conv';
+
+  @override
+  Future<List<Conversation>> listConversations(String userId) async => [];
 
   @override
   Future<List<Message>> fetchHistory({
@@ -49,6 +53,7 @@ void main() {
 
     expect(find.text('MinChat'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
+    expect(find.byIcon(Icons.menu), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), 'Hello');
     await tester.tap(find.byIcon(Icons.send));

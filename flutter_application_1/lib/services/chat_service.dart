@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../models/conversation.dart';
 import '../models/message.dart';
 import '../utils/session.dart';
 
@@ -126,6 +127,28 @@ class ChatService {
   }
 
   void dispose() => _client.close();
+
+  Future<List<Conversation>> listConversations(String userId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/conversations/$userId');
+      final response =
+          await _client.get(uri).timeout(const Duration(seconds: 10));
+      if (response.statusCode < 200 || response.statusCode >= 300) return [];
+      final data = jsonDecode(response.body);
+      final List<dynamic> raw = data is List
+          ? data
+          : (data is Map<String, dynamic>
+              ? (data['conversations'] ?? data['data'] ?? [])
+              : []);
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(Conversation.fromJson)
+          .where((c) => c.id.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
 
   Future<List<Message>> fetchHistory({
     required String userId,
